@@ -308,40 +308,51 @@
   }
 
   function downloadPdf() {
-    if (!window.jspdf || !window.jspdf.jsPDF) {
-      showToast('PDF library did not load — check your connection');
-      return;
+    try {
+      const jspdfNS = window.jspdf;
+      if (!jspdfNS || !jspdfNS.jsPDF) {
+        showToast('PDF library failed to load — check your internet connection and reload the page');
+        return;
+      }
+      const { jsPDF } = jspdfNS;
+      const doc = new jsPDF();
+      const t = totals();
+      const list = filteredEntries();
+
+      doc.setFontSize(16);
+      doc.text('Club Ledger', 14, 18);
+      doc.setFontSize(10);
+      doc.setTextColor(120);
+      doc.text('Generated ' + new Date().toLocaleDateString('en-IN'), 14, 24);
+
+      doc.setFontSize(11);
+      doc.setTextColor(20);
+      doc.text('Balance: ' + fmtPlain(t.balance), 14, 34);
+      doc.text('Total income: ' + fmtPlain(t.income), 14, 40);
+      doc.text('Total expense: ' + fmtPlain(t.expense), 14, 46);
+
+      const rows = list.map(e => [e.date, e.description, e.category, e.type === 'income' ? 'Income' : 'Expense', fmtPlain(e.amount)]);
+
+      if (typeof doc.autoTable !== 'function') {
+        showToast('PDF table plugin failed to load — check your internet connection and reload the page');
+        return;
+      }
+
+      doc.autoTable({
+        head: [['Date', 'Description', 'Category', 'Type', 'Amount']],
+        body: rows,
+        startY: 54,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [27, 42, 65] },
+        columnStyles: { 4: { halign: 'right' } },
+      });
+
+      doc.save('ledger-' + new Date().toISOString().slice(0, 10) + '.pdf');
+      showToast('PDF downloaded');
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      showToast('PDF export failed — open browser console (F12) for details');
     }
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const t = totals();
-    const list = filteredEntries();
-
-    doc.setFontSize(16);
-    doc.text('Club Ledger', 14, 18);
-    doc.setFontSize(10);
-    doc.setTextColor(120);
-    doc.text('Generated ' + new Date().toLocaleDateString('en-IN'), 14, 24);
-
-    doc.setFontSize(11);
-    doc.setTextColor(20);
-    doc.text('Balance: ' + fmtPlain(t.balance), 14, 34);
-    doc.text('Total income: ' + fmtPlain(t.income), 14, 40);
-    doc.text('Total expense: ' + fmtPlain(t.expense), 14, 46);
-
-    const rows = list.map(e => [e.date, e.description, e.category, e.type === 'income' ? 'Income' : 'Expense', fmtPlain(e.amount)]);
-
-    doc.autoTable({
-      head: [['Date', 'Description', 'Category', 'Type', 'Amount']],
-      body: rows,
-      startY: 54,
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [27, 42, 65] },
-      columnStyles: { 4: { halign: 'right' } },
-    });
-
-    doc.save('ledger-' + new Date().toISOString().slice(0, 10) + '.pdf');
-    showToast('PDF downloaded');
   }
 
   function totals() {
